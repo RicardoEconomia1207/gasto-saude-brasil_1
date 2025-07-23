@@ -1,0 +1,57 @@
+# Carregar pacotes
+library(dplyr)
+library(readr)
+library(stringr)
+library(ggplot2)
+library(scales)
+
+# Ler o arquivo CSV com separador ";"
+df <- read_delim("tabela SUS renda percaipa.csv",
+                 delim = ";", 
+                 locale = locale(encoding = "Latin1"))
+
+# Limpar e converter as colunas numéricas
+df <- df %>%
+  mutate(
+    Populacao = str_replace_all(`População (total)`, "[.]", "") %>%
+                str_replace(",", ".") %>% as.numeric(),
+    Gasto_Saude = str_replace_all(`Gasto Saúde`, "[.]", "") %>%
+                  str_replace(",", ".") %>% as.numeric(),
+    IPCA = str_replace(IPCA, ",", ".") %>% as.numeric()
+  )
+
+# Calcular o gasto per capita nominal
+df <- df %>%
+  mutate(
+    Gasto_pc_nominal = Gasto_Saude / Populacao
+  )
+
+# Corrigir os valores pela inflação (IPCA do último ano da série)
+ipca_base <- df$IPCA[nrow(df)]
+
+df <- df %>%
+  mutate(
+    Gasto_pc_real = Gasto_pc_nominal * (ipca_base / IPCA)
+  )
+
+# Criar gráfico do gasto per capita nominal
+grafico_nominal <- ggplot(df, aes(x = as.numeric(Ano), y = Gasto_pc_nominal)) +
+  geom_line(color = "blue", size = 1.2) +
+  geom_point(color = "blue") +
+  scale_y_continuous(labels = dollar_format(prefix = "R$ ", big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Gasto Público em Saúde per capita (nominal)",
+       x = "Ano", y = "Reais correntes") +
+  theme_minimal()
+
+# Criar gráfico do gasto per capita real
+grafico_real <- ggplot(df, aes(x = as.numeric(Ano), y = Gasto_pc_real)) +
+  geom_line(color = "darkgreen", size = 1.2) +
+  geom_point(color = "darkgreen") +
+  scale_y_continuous(labels = dollar_format(prefix = "R$ ", big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Gasto Público em Saúde per capita (valores reais)",
+       x = "Ano", y = "Reais constantes") +
+  theme_minimal()
+
+# Mostrar os gráficos
+print(grafico_nominal)
+print(grafico_real)
